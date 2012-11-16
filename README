@@ -1,1 +1,5 @@
 fastq-split
+--------------------------------------------------------------------------
+This project is created for dealing with paired-end reads processed by SGA
+preprocess and filter.  The input of fastq-split is the read seqeunces in
+fastq format.  Paired reads and unpaired reads will be output separately.

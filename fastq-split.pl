@@ -9,6 +9,8 @@ output file: paired-end reads - xxx.pe.r1.fastq and xxx.pe.r2.fastq; mates - xxx
 # module included
 use strict;
 use Getopt::Long;
+use Bio::SeqIO;
+use Bio::SeqIO::fastq;
 
 # variable
 # argument
@@ -53,19 +55,19 @@ sub getReadid4Cmp{
     
     my @rbuf = split("/", $rid);
     my $pairid = $rbuf[0];
-    my $mateid = $rbuf[1];
+    my $mateid = int($rbuf[1]);
     
-    my $read = "@$rid\n$seq\n+\n$qual\n";
+    #my $read = "@$rid\n$seq\n+\n$qual\n";
     
-    $hashrq{$rid} = $read;
+    #$hashrq{$rid} = $read;
     
     if(defined($hash_read{$pairid}) && $hash_read{$pairid}){
       ;
     }else{
       $hash_read{$pairid} = $hash_read_cnt;
       $ihash_read{$hash_read_cnt} = $pairid;
-      $pairlabel[$hash_read_cnt][0] = 0;
       $pairlabel[$hash_read_cnt][1] = 0;
+      $pairlabel[$hash_read_cnt][2] = 0;
       $hash_read_cnt++;
     }
     
@@ -81,32 +83,40 @@ sub fastqSplit{
   my $r1_pair = $oprefix . ".r1.pair.fastq";
   my $r2_pair = $oprefix . ".r2.pair.fastq";
   
-  open(my $r1u_fh, ">$r1_uniq");
-  open(my $r2u_fh, ">$r2_uniq");
-  open(my $r1p_fh, ">$r1_pair");
-  open(my $r2p_fh, ">$r2_pair");
+  my $in = Bio::SeqIO->new(-format => 'fastq-illumina', -file => $fqfile);
+  
+  my $out_r1_uniq = Bio::SeqIO->new(-format => 'fastq-illumina', -file => '>$r1_uniq');
+  my $out_r2_uniq = Bio::SeqIO->new(-format => 'fastq-illumina', -file => '>$r2_uniq');
+  my $out_r1_pair = Bio::SeqIO->new(-format => 'fastq-illumina', -file => '>$r1_pair');
+  my $out_r2_pair = Bio::SeqIO->new(-format => 'fastq-illumina', -file => '>$r2_pair');
+  
+  while(my $seq = $in->next_seq){
+    my $rid = $seq->id();
+    $rid = substr($rid, 1);     # get readid
+    my @rbuf = split("/", $rid);
+    my $pairid = $rbuf[0];
+    my $mateid = int($rbuf[1]);
 
-  for(my $i = 0; $i < $hash_read_cnt; $i++){
-    my $pair1id = $ihash_read{$i} . "/1";
-    my $pair2id = $ihash_read{$i} . "/2";
+    my $hashid = $hash_read{$pairid};
     
-    if($pairlabel[$i][0] && $pairlabel[$i][1]){
-      printf $r1p_fh $hashrq{$pair1id};
-      printf $r2p_fh $hashrq{$pair2id};
+    if($pairlabel[$hashid][$mateid] && $pairlabel[$hashid][$mateid]){
+      if($mateid == 1){
+        $out_r1_pair->write_seq($seq);
+      }elsif($mateid == 2){
+        $out_r2_pair->write_seq($seq);      
+      }
     }else{
-      if($pairlabel[$i][0]){
-        printf $r1u_fh $hashrq{$pair1id};
-      }elsif($pairlabel[$i][1]){
-      printf $r2u_fh $hashrq{$pair1id};
+      if($pairlabel[$hashid][$mateid]){
+        if($mateid == 1){
+          $out_r1_uniq->write_seq($seq);
+        }elsif($mateid == 2){
+          $out_r2_uniq->write_seq($seq);
+        }   
       }
     }
   }
-  
-  close($r1u_fh);
-  close($r2u_fh);
-  close($r1p_fh);
-  close($r2p_fh);
 }
+
 =comment
 1. get readid from single fastq
 2. identify read1 and read2 and then put them in hash and mark them
